@@ -41,11 +41,7 @@ investigators through the NIAGADS Data Sharing Service after approval of a Data 
 summary statistics are available from the FinnGen consortium. No individual-level data are redistributed here.
 
 ## Using the code
-
-The scripts were run on a SLURM cluster and are provided as run, renamed to describe what they do. Inside the
-scripts, the authors' working labels (for example `projcell` for a study unit, `pair33` for the sample preparation,
-`QC_label7` for the variant filter, `plasmode` for the benchmark on observed genotypes) remain in comments and
-object names; `docs/GLOSSARY.md` translates them. Cluster-specific locations were replaced by placeholders:
+File directories were replaced by placeholders:
 `${ADSP_ROOT}` is the analysis root that held the phenotype table (`pheno/`), the QC labels, PCs and sparse GRM
 (`processed/`), the annotated GDS files, null models and scan outputs (`output/`) and the scripts themselves
 (`src/`, `revision/scripts/`); `${WORK_DIR}`, `${HOME_DIR}`, `${CONDA_ROOT}` and `${R_LIBS_ROOT}` are the scratch
