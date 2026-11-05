@@ -1,0 +1,908 @@
+diff -ruN -x '*.o' -x '*.so' -x .git a/DESCRIPTION b/DESCRIPTION
+--- a/DESCRIPTION	2025-03-23 13:13:27.000000000 -0400
++++ b/DESCRIPTION	2026-10-19 13:12:54.486091545 -0400
+@@ -16,3 +16,4 @@
+ RoxygenNote: 7.2.3
+ Suggests: knitr, rmarkdown
+ VignetteBuilder: knitr
++RootcheckPatch: 2026-10-19 saddlepoint root verification in the private solver copy of src/Individual_Score_Test_SPA.cpp (NR, bisection, Saddle, Individual_Score_Test_SPA caller); R/coding.R, plof.R, plof_ds.R, missense.R, disruptive_missense.R, synonymous.R set STAAR_ROOTCHECK_CONTEXT=<gene>|<category> for the diagnostic log (rev 2); upstream commit 7e868f23c85ba0713dd00c8512ad23cca7fbc8f9
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/coding.R b/R/coding.R
+--- a/R/coding.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/coding.R	2026-10-19 13:09:31.345951837 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -161,6 +163,8 @@
+ 	## Annotation
+ 	Anno.Int.PHRED.sub.category <- Anno.Int.PHRED.sub[lof.in.plof,]
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|plof_ds"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+@@ -263,6 +267,8 @@
+ 	## Annotation
+ 	Anno.Int.PHRED.sub.category <- Anno.Int.PHRED.sub[lof.in.plof,]
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|plof"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+@@ -364,6 +370,8 @@
+ 	## Annotation
+ 	Anno.Int.PHRED.sub.category <- Anno.Int.PHRED.sub[lof.in.synonymous,]
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|synonymous"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+@@ -466,6 +474,8 @@
+ 	## Annotation
+ 	Anno.Int.PHRED.sub.category <- Anno.Int.PHRED.sub[lof.in.missense,]
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|missense"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+@@ -552,6 +562,8 @@
+ 	## Annotation
+ 	Anno.Int.PHRED.sub.category <- Anno.Int.PHRED.sub[lof.in.dmissense,]
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|disruptive_missense"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/disruptive_missense.R b/R/disruptive_missense.R
+--- a/R/disruptive_missense.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/disruptive_missense.R	2026-10-19 13:09:31.366968635 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -135,6 +137,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|disruptive_missense"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/missense.R b/R/missense.R
+--- a/R/missense.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/missense.R	2026-10-19 13:09:31.371294085 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -133,6 +135,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|missense"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+@@ -262,6 +266,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|disruptive_missense"))
+ 	pvalues_dm <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/plof.R b/R/plof.R
+--- a/R/plof.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/plof.R	2026-10-19 13:09:31.349903518 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -135,6 +137,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|plof"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/plof_ds.R b/R/plof_ds.R
+--- a/R/plof_ds.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/plof_ds.R	2026-10-19 13:09:31.356709675 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -137,6 +139,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|plof_ds"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/R/synonymous.R b/R/synonymous.R
+--- a/R/synonymous.R	2025-03-23 13:13:27.000000000 -0400
++++ b/R/synonymous.R	2026-10-19 13:09:31.362886878 -0400
+@@ -8,6 +8,8 @@
+ 	## evaluate choices
+ 	variant_type <- match.arg(variant_type)
+ 	geno_missing_imputation <- match.arg(geno_missing_imputation)
++	## rootcheck patch (2026-10-19): the context variable is cleared when this function returns
++	on.exit(Sys.unsetenv("STAAR_ROOTCHECK_CONTEXT"), add = TRUE)
+ 
+ 	phenotype.id <- as.character(obj_nullmodel$id_include)
+ 	n_pheno <- obj_nullmodel$n.pheno
+@@ -133,6 +135,8 @@
+ 		}
+ 	}
+ 
++	## rootcheck patch (2026-10-19): gene/category context for the saddlepoint diagnostic log (STAAR/src/rootcheck.cpp)
++	Sys.setenv(STAAR_ROOTCHECK_CONTEXT = paste0(gene_name, "|synonymous"))
+ 	pvalues <- 0
+ 	if(n_pheno == 1)
+ 	{
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/Individual_Score_Test_SPA.cpp b/src/Individual_Score_Test_SPA.cpp
+--- a/src/Individual_Score_Test_SPA.cpp	2025-03-23 13:13:27.000000000 -0400
++++ b/src/Individual_Score_Test_SPA.cpp	2026-10-19 13:09:31.341277352 -0400
+@@ -4,6 +4,10 @@
+ #include <RcppArmadillo.h>
+ #include <Rcpp.h>
+ #include <math.h>
++#include <float.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
+ 
+ using namespace Rcpp;
+ 
+@@ -30,16 +34,92 @@
+ // declare Saddle_Binary_SPA using Bisection
+ double Saddle_Binary_SPA_Bisection(double q, arma::vec muhat, arma::vec G, double tol, int max_iter, double xmin, double xmax, bool lower);
+ // check na
+-bool check_is_na(double x); 
++bool check_is_na(double x);
+ // check same sign
+ bool haveSameSign(double a, double b);
+ 
++// ---- rootcheck patch (2026-10-19) -----------------------------------------------------------------
++// STAARpipeline carries its own private copy of the STAAR saddlepoint solver in this file. The same
++// root verification as in the patched STAAR package is applied here: NR_Binary_SPA verifies the score
++// equation at its returned iterate (polishing when needed) and returns NA_REAL otherwise;
++// Bisection_Binary_SPA expands its bracket, converges to the score-equation tolerance and returns
++// NA_REAL when it cannot; Saddle_Binary_SPA* return NA_REAL on NA roots; the caller keeps NA (not 1)
++// when both solvers fail. Diagnostic events are appended to the file named by STAAR_ROOTCHECK_LOG
++// (columns as in STAAR/src/rootcheck.cpp, pkg = STAARpipeline).
++static const double ROOTCHECK_RTOL = 1e-6;
++static long   rc_call_seq   = 0;
++static int    rc_n_variants = -1;
++static double rc_cmac       = -1.0;
++static int    rc_wn         = -1;
++static int    rc_component  = -1;
++static double rc_p_normal   = -1.0;
++static char   rc_context[512] = "";
++
++static double rootcheck_rtol(double q)
++{
++	double s = fabs(q);
++	if(s < 1.0) s = 1.0;
++	return ROOTCHECK_RTOL * s;
++}
++
++static double rootcheck_K1(double x, arma::vec muhat, arma::vec G, double q)
++{
++	double r = K1_Binary_SPA(x, muhat, G, q);
++	if((R_finite(r)==0)||(check_is_na(r)))
++	{
++		r = K1_Binary_SPA_alt(x, muhat, G, q);
++	}
++	return r;
++}
++
++static void rootcheck_set_call(int n_variants, double cmac, int wn)
++{
++	rc_call_seq = rc_call_seq + 1;
++	rc_n_variants = n_variants;
++	rc_cmac = cmac;
++	rc_wn = wn;
++	rc_component = -1;
++	rc_p_normal = -1.0;
++	const char* c = std::getenv("STAAR_ROOTCHECK_CONTEXT");
++	if(c == NULL)
++	{
++		rc_context[0] = '\0';
++	}else
++	{
++		std::strncpy(rc_context, c, sizeof(rc_context) - 1);
++		rc_context[sizeof(rc_context) - 1] = '\0';
++		for(char* p = rc_context; *p != '\0'; ++p)
++		{
++			if((*p == '\t')||(*p == '\n')||(*p == '\r')) *p = ' ';
++		}
++	}
++}
++
++static void rootcheck_set_component(int component, double p_normal)
++{
++	rc_component = component;
++	rc_p_normal = p_normal;
++}
++
++static void rootcheck_log(const char* event, double q, double x_newton, double resid_newton, double x_final, double resid_final, int iter)
++{
++	const char* f = std::getenv("STAAR_ROOTCHECK_LOG");
++	if(f == NULL || f[0] == '\0') return;
++	FILE* fp = std::fopen(f, "a");
++	if(fp == NULL) return;
++	std::fprintf(fp, "STAARpipeline\t%ld\t%d\t%.12g\t%d\t%d\t%.10g\t%s\t%s\t%.17g\t%.17g\t%.17g\t%.17g\t%.17g\t%d\t%s\tNA\n",
++	             rc_call_seq, rc_n_variants, rc_cmac, rc_wn, rc_component, rc_p_normal,
++	             (q < 0 ? "lower" : "upper"), event, q, x_newton, resid_newton, x_final, resid_final, iter, rc_context);
++	std::fclose(fp);
++}
++// ---- end of rootcheck helpers ---------------------------------------------------------------------
++
+ // [[Rcpp::export]]
+ arma::vec Individual_Score_Test_SPA(arma::mat G, arma::mat XW, arma::mat XXWX_inv, arma::vec residuals, arma::vec muhat, double tol, int max_iter)
+ {
+ 	int i,k;
+ 	double sum0 = 0.0;
+-	
++
+ 	bool lower1 = false;
+ 	bool lower2 = true;
+ 
+@@ -49,12 +129,12 @@
+ 	// p-values
+ 	arma::vec res;
+ 	res.ones(un);
+-	
++
+ 	// p-values components
+ 	double respart1 = 0.0;
+ 	double respart2 = 0.0;
+-	
+-	// calculate G_tilde 
++
++	// calculate G_tilde
+ 	arma::mat G_tilde;
+ 	G_tilde.zeros(vn,un);
+ 
+@@ -63,7 +143,7 @@
+ 	// Score statistics
+ 	arma::rowvec x = trans(residuals)*G;
+ 	int n = x.size();
+-	
++
+ 	// init value of bisection
+ 	double xmin = -100.0;
+ 	double xmax = 100.0;
+@@ -71,30 +151,41 @@
+ 	for(i = 0; i < un; i++)
+ 	{
+ 		sum0 = x(i);
+-		
++
++		// rootcheck patch (2026-10-19): context of this single-variant call for the diagnostic log
++		rootcheck_set_call(un, arma::accu(G.col(i)), 1);
++		rootcheck_set_component(i, NA_REAL);
+ 		// calculate p-value
+ 		respart1 = 1.0;
+ 		respart2 = 1.0;
+ 		respart1 = Saddle_Binary_SPA(fabs(sum0), muhat, G_tilde.col(i), tol, max_iter, lower1);
+-		
++
+ 		if((check_is_na(respart1))||(respart1 == 1.0))
+ 		{
+ 			respart1 = Saddle_Binary_SPA_Bisection(fabs(sum0), muhat, G_tilde.col(i), tol, max_iter, xmin, xmax, lower1);
+ 		}
+-		
+-		if((check_is_na(respart1))||(respart1 == 1.0))
++
++		// rootcheck patch (2026-10-19): a solver failure (NA from both Newton and bisection) stays NA
++		// so that it is visible in the output; p == 1 from a root at zero stays 1.
++		if(check_is_na(respart1))
++		{
++			res(i) = NA_REAL;
++		}else if(respart1 == 1.0)
+ 		{
+ 			res(i) = 1;
+ 		}else
+ 		{
+ 			respart2 = Saddle_Binary_SPA(-fabs(sum0), muhat, G_tilde.col(i), tol, max_iter, lower2);
+-			
++
+ 			if((check_is_na(respart2))||(respart2 == 1.0))
+ 			{
+ 				respart2 = Saddle_Binary_SPA_Bisection(-fabs(sum0), muhat, G_tilde.col(i), tol, max_iter, xmin, xmax, lower2);
+ 			}
+-			
+-			if((check_is_na(respart2))||(respart2 == 1.0))
++
++			if(check_is_na(respart2))
++			{
++				res(i) = NA_REAL;
++			}else if(respart2 == 1.0)
+ 			{
+ 				res(i) = 1;
+ 			}else
+@@ -102,11 +193,11 @@
+ 				res(i) = respart1 + respart2;
+ 			}
+ 		}
+-		
++
+ 		// if saddle point approximation fails, set the p-value as 1.0
+-		if(res(i) > 1)
++		if((!check_is_na(res(i)))&&(res(i) > 1))
+ 		{
+-			res(i) = 1;		
++			res(i) = 1;
+ 		}
+ 	}
+ 
+@@ -117,7 +208,7 @@
+ double Saddle_Binary_SPA(double q, arma::vec muhat, arma::vec G, double tol, int max_iter, bool lower)
+ {
+ 	bool logp = false;
+-	
++
+ 	// init for NR
+ 	double init = 0.0;
+ 
+@@ -126,13 +217,18 @@
+ 
+ 	// Saddle point approximation
+     double xhat = NR_Binary_SPA(muhat,G,q,init,tol,max_iter);
++    // rootcheck patch (2026-10-19): an unverified Newton root is NA; report NA so that the caller bisects
++    if(check_is_na(xhat))
++    {
++    	return NA_REAL;
++    }
+     double w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+-	
++
+ 	if((R_finite(w)==0)||(check_is_na(w)))
+ 	{
+ 		w = sqrt(2*(xhat*q - K_Binary_SPA_alt(xhat,muhat,G)));
+ 	}
+-	
++
+     if (xhat < 0){
+         w = -w;
+     }
+@@ -142,7 +238,7 @@
+ 	{
+ 		ki = xhat*sqrt(K2_Binary_SPA_alt(xhat,muhat,G));
+ 	}
+-	
++
+ 	if(fabs(xhat)<1e-04)
+ 	{
+ 		res = 1.0;
+@@ -150,7 +246,7 @@
+ 	{
+ 		res =  R::pnorm(w+log(ki/w)/w,0.0,1.0,lower,logp);
+ 	}
+-    
++
+ 	return res;
+ }
+ 
+@@ -159,40 +255,40 @@
+ {
+ 	double xi = 0.0;
+ 	double xi_update = 0.0;
+-	
++
+ 	// first step
+ 	xi = init;
+ 	xi_update = init;
+-	
++
+ 	if(fabs(K1_Binary_SPA(xi, muhat, G, q)) > tol)
+ 	{
+ 		xi_update = xi - K1_Binary_SPA(xi, muhat, G, q)/K2_Binary_SPA(xi, muhat, G);
+ 	}
+-	
++
+ 	// iteration number
+ 	int no_iter = 0;
+ 	double numerator = 0.0;
+ 	double denominator = 1.0;
+-	
++
+ 	while (!(check_is_na(xi_update))&&(R_finite(xi_update)==1)&&(fabs(xi_update - xi) > tol)&&(fabs(K1_Binary_SPA(xi_update, muhat, G, q)) > tol)&&(no_iter < max_iter))
+     {
+ 		no_iter = no_iter + 1;
+-		xi = xi_update;	
+-		
++		xi = xi_update;
++
+ 		// calculate numerator
+ 		numerator = K1_Binary_SPA(xi, muhat, G, q);
+ 		if((R_finite(numerator)==0)||(check_is_na(numerator)))
+ 		{
+ 			numerator = K1_Binary_SPA_alt(xi, muhat, G, q);
+ 		}
+-		
++
+ 		// calculate denominator
+ 		denominator = K2_Binary_SPA(xi, muhat, G);
+ 		if((R_finite(denominator)==0)||(check_is_na(denominator)))
+ 		{
+ 			denominator = K2_Binary_SPA_alt(xi, muhat, G);
+ 		}
+-		
++
+ 		xi_update = xi - numerator/denominator;
+     }
+ 
+@@ -201,18 +297,18 @@
+ 	{
+ 		xi_update = xi;
+ 	}
+-	
+-	
++
++
+ 	// test convergence
+-	double w = 0.0; 
+-	double xhat = 0.0; 
++	double w = 0.0;
++	double xhat = 0.0;
+ 	double ki = 0.0;
+ 
+ 	if(no_iter == max_iter)
+ 	{
+ 		w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+ 		xhat = xi_update;
+-		
++
+ 		if (xhat < 0){
+ 			w = -w;
+ 		}
+@@ -222,20 +318,67 @@
+ 		{
+ 			ki = xhat*sqrt(K2_Binary_SPA_alt(xhat,muhat,G));
+ 		}
+-	
++
+ 		if(fabs(w+log(ki/w)/w) < 38)
+ 		{
+-			xi_update = 0.0;	
++			xi_update = 0.0;
+ 		}
+ 	}
+-	
+-	return xi_update;
++
++	// ---- rootcheck patch (2026-10-19): verify the score equation at the returned iterate (see the
++	// patched STAAR/src/NR_Binary_SPA.cpp for the rationale); NA_REAL on failure.
++	double rtol = rootcheck_rtol(q);
++	double x_newton = xi_update;
++	double resid = rootcheck_K1(xi_update, muhat, G, q);
++	double resid_newton = resid;
++	if((R_finite(xi_update)==0)||(check_is_na(xi_update))||(R_finite(resid)==0)||(check_is_na(resid))||(fabs(xi_update) > 1e10))
++	{
++		rootcheck_log("newton_nonfinite", q, x_newton, resid_newton, NA_REAL, NA_REAL, no_iter);
++		return NA_REAL;
++	}
++	if(fabs(resid) <= rtol)
++	{
++		return xi_update;
++	}
++	if(no_iter >= max_iter)
++	{
++		rootcheck_log("newton_maxiter", q, x_newton, resid_newton, NA_REAL, NA_REAL, no_iter);
++		return NA_REAL;
++	}
++	int extra = 0;
++	while((extra < 20)&&(fabs(resid) > rtol))
++	{
++		denominator = K2_Binary_SPA(xi_update, muhat, G);
++		if((R_finite(denominator)==0)||(check_is_na(denominator)))
++		{
++			denominator = K2_Binary_SPA_alt(xi_update, muhat, G);
++		}
++		double x_next = xi_update - resid/denominator;
++		if((R_finite(x_next)==0)||(check_is_na(x_next)))
++		{
++			break;
++		}
++		xi_update = x_next;
++		resid = rootcheck_K1(xi_update, muhat, G, q);
++		if((R_finite(resid)==0)||(check_is_na(resid)))
++		{
++			break;
++		}
++		extra = extra + 1;
++	}
++	if((R_finite(xi_update)==1)&&(R_finite(resid)==1)&&(fabs(resid) <= rtol)&&(fabs(xi_update) <= 1e10))
++	{
++		rootcheck_log("newton_polished", q, x_newton, resid_newton, xi_update, resid, extra);
++		return xi_update;
++	}
++	rootcheck_log("newton_unverified", q, x_newton, resid_newton, xi_update, resid, extra);
++	return NA_REAL;
+ }
+ 
+ double Saddle_Binary_SPA_Bisection(double q, arma::vec muhat, arma::vec G, double tol, int max_iter, double xmin, double xmax, bool lower)
+ {
+ 	bool logp = false;
+-	
++
+ 	double ki = 0.0;
+ 	double res = 1.0;
+ 
+@@ -243,9 +386,9 @@
+ 	// golden section search for selecting init value of bisection algorithm
+ 	arma::vec xlimit;
+ 	xlimit.ones(2);
+-	
++
+ 	xlimit = goldenSectionSearchForSignChange(xmin, xmax, muhat, G, q, tol, max_iter);
+-	
++
+ 	if(xlimit(0) < xlimit(1))
+ 	{
+ 		xmin = xlimit(0);
+@@ -255,15 +398,20 @@
+ 		xmin = xlimit(1);
+ 		xmax = xlimit(0);
+ 	}
+-	
++
+     double xhat = Bisection_Binary_SPA(muhat, G, q, xmin, xmax, tol);
++    // rootcheck patch (2026-10-19): a bisection that could not bracket or verify a root is NA
++    if(check_is_na(xhat))
++    {
++    	return NA_REAL;
++    }
+     double w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+-	
++
+ 	if((R_finite(w)==0)||(check_is_na(w)))
+ 	{
+ 		w = sqrt(2*(xhat*q - K_Binary_SPA_alt(xhat,muhat,G)));
+ 	}
+-	
++
+     if (xhat < 0){
+         w = -w;
+     }
+@@ -273,7 +421,7 @@
+ 	{
+ 		ki = xhat*sqrt(K2_Binary_SPA_alt(xhat,muhat,G));
+ 	}
+-	
++
+ 	if(fabs(xhat)<1e-04)
+ 	{
+ 		res = 1.0;
+@@ -281,7 +429,7 @@
+ 	{
+ 		res =  R::pnorm(w+log(ki/w)/w,0.0,1.0,lower,logp);
+ 	}
+-    
++
+ 	return res;
+ }
+ 
+@@ -293,67 +441,84 @@
+     // the range of x to search
+     double xupper = xmax;
+     double xlower = xmin;
+-	
++
+ 	double K1left = 0.0;
+ 	double K1right = 0.0;
+-	
++
+     double x0 = 0.0;
+     double K1x0 = 1.0;
+-	
+-	K1left = K1_Binary_SPA(xlower, muhat, G, q);
+-	if((R_finite(K1left)==0)||(check_is_na(K1left)))
++
++	// ---- rootcheck patch (2026-10-19): bracket expansion, score-equation tolerance, NA on failure
++	// (see the patched STAAR/src/Bisection_Binary_SPA.cpp for the rationale).
++	double rtol = rootcheck_rtol(q);
++
++	K1left = rootcheck_K1(xlower, muhat, G, q);
++	K1right = rootcheck_K1(xupper, muhat, G, q);
++	if((R_finite(K1left)==0)||(check_is_na(K1left))||(R_finite(K1right)==0)||(check_is_na(K1right)))
+ 	{
+-		K1left = K1_Binary_SPA_alt(xlower, muhat, G, q);
++		rootcheck_log("bisection_nonfinite", q, xlower, K1left, xupper, K1right, 0);
++		return NA_REAL;
+ 	}
+-	
+-	K1right = K1_Binary_SPA(xupper, muhat, G, q);
+-	if((R_finite(K1right)==0)||(check_is_na(K1right)))
++
++	int expand = 0;
++	double width = xupper - xlower;
++	if(width < 1.0)
+ 	{
+-		K1right = K1_Binary_SPA_alt(xupper, muhat, G, q);
++		width = 1.0;
+ 	}
+-	
+-	if((!((R_finite(K1right)==0)||(check_is_na(K1right))))&&(!((R_finite(K1left)==0)||(check_is_na(K1left)))))
+-	{	
+-		if(!haveSameSign(K1left, K1right))
++	while(haveSameSign(K1left, K1right)&&(expand < 60))
++	{
++		if(K1right < 0)
+ 		{
+-			while ((fabs(xupper-xlower) > tol)&&(fabs(K1x0) > tol))
+-			{
+-				x0 = (xupper + xlower)/2.0;
+-				K1x0 = K1_Binary_SPA(x0, muhat, G, q);
+-				
+-				if((R_finite(K1x0)==0)||(check_is_na(K1x0)))
+-				{
+-					K1x0 = K1_Binary_SPA_alt(x0, muhat, G, q);
+-				}
+-			
+-				if(K1x0 == 0)
+-				{
+-					break;
+-				}else
+-				{
+-					if(haveSameSign(K1left, K1x0))
+-					{
+-						xlower = x0;
+-					}else
+-					{
+-						xupper = x0;
+-					}
+-				
+-					K1left = K1_Binary_SPA(xlower, muhat, G, q);
+-					if((R_finite(K1left)==0)||(check_is_na(K1left)))
+-					{
+-						K1left = K1_Binary_SPA_alt(xlower, muhat, G, q);
+-					}
+-	
+-					K1right = K1_Binary_SPA(xupper, muhat, G, q);
+-					if((R_finite(K1right)==0)||(check_is_na(K1right)))
+-					{
+-						K1right = K1_Binary_SPA_alt(xupper, muhat, G, q);
+-					}
+-				}
+-			}
+-		}		
++			xlower = xupper;
++			K1left = K1right;
++			xupper = xupper + width;
++			K1right = rootcheck_K1(xupper, muhat, G, q);
++		}else
++		{
++			xupper = xlower;
++			K1right = K1left;
++			xlower = xlower - width;
++			K1left = rootcheck_K1(xlower, muhat, G, q);
++		}
++		if((R_finite(K1left)==0)||(check_is_na(K1left))||(R_finite(K1right)==0)||(check_is_na(K1right)))
++		{
++			rootcheck_log("bisection_nonfinite", q, xlower, K1left, xupper, K1right, expand);
++			return NA_REAL;
++		}
++		width = width * 2.0;
++		expand = expand + 1;
++	}
++	if(haveSameSign(K1left, K1right))
++	{
++		rootcheck_log("bisection_nobracket", q, xlower, K1left, xupper, K1right, expand);
++		return NA_REAL;
++	}
++
++	int iter = 0;
++	x0 = (xupper + xlower)/2.0;
++	K1x0 = rootcheck_K1(x0, muhat, G, q);
++	while((iter < 400)&&(!((R_finite(K1x0)==0)||(check_is_na(K1x0))))&&(fabs(K1x0) > rtol)&&(fabs(xupper - xlower) > 4.0*DBL_EPSILON*fmax(1.0, fabs(x0))))
++	{
++		if(haveSameSign(K1left, K1x0))
++		{
++			xlower = x0;
++			K1left = K1x0;
++		}else
++		{
++			xupper = x0;
++			K1right = K1x0;
++		}
++		x0 = (xupper + xlower)/2.0;
++		K1x0 = rootcheck_K1(x0, muhat, G, q);
++		iter = iter + 1;
+ 	}
++	if((R_finite(x0)==0)||(check_is_na(x0))||(R_finite(K1x0)==0)||(check_is_na(K1x0))||(fabs(K1x0) > rtol))
++	{
++		rootcheck_log("bisection_unverified", q, xlower, K1left, x0, K1x0, iter);
++		return NA_REAL;
++	}
++	rootcheck_log((expand > 0) ? "bisection_ok_expanded" : "bisection_ok", q, xlower, K1left, x0, K1x0, iter);
+     return x0;
+ }
+ 
+@@ -370,50 +535,50 @@
+ 	// K1 init
+ 	double K1x1 = 0.0;
+ 	double K1x0 = 0.0;
+-	
++
+ 	double phi = (1 + sqrt(5)) / 2;
+-	
++
+ 	K1x0 = K1_Binary_SPA(x(0), muhat, G, q);
+ 	if((R_finite(K1x0)==0)||(check_is_na(K1x0)))
+ 	{
+ 		K1x0 = K1_Binary_SPA_alt(x(0), muhat, G, q);
+ 	}
+-	
++
+ 	K1x1 = K1_Binary_SPA(x(1), muhat, G, q);
+ 	if((R_finite(K1x1)==0)||(check_is_na(K1x1)))
+ 	{
+ 		K1x1 = K1_Binary_SPA_alt(x(1), muhat, G, q);
+ 	}
+-	
+-	while ((iter < max_iter) && (fabs(x(1) - x(0)) > tol) && haveSameSign(K1x0,K1x1)) 
++
++	while ((iter < max_iter) && (fabs(x(1) - x(0)) > tol) && haveSameSign(K1x0,K1x1))
+ 	{
+ 		x(1) = b - (b - a) / phi;
+         x(0) = a + (b - a) / phi;
+-		
++
+ 		K1x0 = K1_Binary_SPA(x(0), muhat, G, q);
+ 		if((R_finite(K1x0)==0)||(check_is_na(K1x0)))
+ 		{
+ 			K1x0 = K1_Binary_SPA_alt(x(0), muhat, G, q);
+ 		}
+-	
++
+ 		K1x1 = K1_Binary_SPA(x(1), muhat, G, q);
+ 		if((R_finite(K1x1)==0)||(check_is_na(K1x1)))
+ 		{
+ 			K1x1 = K1_Binary_SPA_alt(x(1), muhat, G, q);
+ 		}
+-	
+-        if (K1x1 < K1x0) 
++
++        if (K1x1 < K1x0)
+ 		{
+             b = x(0);
+-        }else 
++        }else
+ 		{
+             a = x(1);
+         }
+         iter++;
+     }
+-	
++
+ 	return x;
+-	
++
+ }
+ 
+ 
+@@ -442,7 +607,7 @@
+     for(int i = 0; i < n; i++)
+     {
+ 		// res = res - x * muhat(i) * G(i);
+-		
++
+         res = res + log((1 - muhat(i))*exp(-x * G(i)) + muhat(i));
+     }
+ 
+@@ -460,7 +625,7 @@
+         res = res - muhat(i) * G(i);
+ 		res = res + muhat(i) * G(i)/(muhat(i) + (1 - muhat(i))*exp(-x * G(i)));
+     }
+-	
++
+     res = res - q;
+ 
+     return res;
+@@ -478,49 +643,51 @@
+         res = res - muhat(i) * G(i);
+ 		res = res + muhat(i) * G(i) * exp(x * G(i)) /(muhat(i)* exp(x * G(i)) + (1 - muhat(i)));
+     }
+-	
++
+     res = res - q;
+ 
+     return res;
+ }
+ 
+ 
++
+ double K2_Binary_SPA(double x, arma::vec muhat, arma::vec G)
+ {
+     double res = 0.0;
+ 	double temp1 = 0.0;
+ 	double temp2 = 1.0;
+-	
++
+     const int n = muhat.size();
+ 
+     for(int i = 0; i < n; i++)
+     {
+ 		temp1 = muhat(i) * (1 - muhat(i)) * pow(G(i),2.0)*exp(-x * G(i));
+ 		temp2 = muhat(i) + (1 - muhat(i)) * exp(-x * G(i));
+-		
++
+         res = res + temp1/pow(temp2,2.0);
+     }
+-	
++
+     return res;
+ }
+ 
+ 
++
+ double K2_Binary_SPA_alt(double x, arma::vec muhat, arma::vec G)
+ {
+     double res = 0.0;
+ 	double temp1 = 0.0;
+ 	double temp2 = 1.0;
+-	
++
+     const int n = muhat.size();
+ 
+     for(int i = 0; i < n; i++)
+     {
+ 		temp1 = muhat(i) * (1 - muhat(i)) * pow(G(i),2.0);
+ 		temp2 = muhat(i) * exp(x * G(i)) + (1 - muhat(i));
+-		
++
+         res = res + temp1/pow(temp2,2.0);
+     }
+-	
++
+     return res;
+ }
+ 
+@@ -530,4 +697,4 @@
+ 
+ bool haveSameSign(double a, double b) {
+     return (a >= 0) == (b >= 0);
+-}
+\ No newline at end of file
++}

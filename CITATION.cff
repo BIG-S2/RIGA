@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the manuscript below."
+title: "RIGA: analysis code for 'Study design determines valid genetic discovery in heterogeneous sequencing consortia'"
+version: "1.0.0"
+date-released: "2026-11-05"
+license: MIT
+repository-code: "https://github.com/ORGANIZATION/RIGA"
+authors:
+  - family-names: Li
+    given-names: Xiaoqi
+  - family-names: Li
+    given-names: Xihao
+  - family-names: Tang
+    given-names: Borui
+  - family-names: Li
+    given-names: Tengfei
+  - family-names: Lin
+    given-names: Weili
+  - family-names: Zhu
+    given-names: Hongtu
+    email: htzhu@email.unc.edu
+preferred-citation:
+  type: article
+  title: "Study design determines valid genetic discovery in heterogeneous sequencing consortia"
+  authors:
+    - family-names: Li
+      given-names: Xiaoqi
+    - family-names: Li
+      given-names: Xihao
+    - family-names: Tang
+      given-names: Borui
+    - family-names: Li
+      given-names: Tengfei
+    - family-names: Lin
+      given-names: Weili
+    - family-names: Zhu
+      given-names: Hongtu
+  year: 2026

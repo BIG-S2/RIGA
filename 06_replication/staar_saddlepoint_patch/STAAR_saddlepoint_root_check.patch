@@ -1,0 +1,781 @@
+diff -ruN -x '*.o' -x '*.so' -x .git a/DESCRIPTION b/DESCRIPTION
+--- a/DESCRIPTION	2025-02-08 00:13:14.000000000 -0500
++++ b/DESCRIPTION	2026-10-19 13:12:54.468813153 -0400
+@@ -16,3 +16,4 @@
+ RoxygenNote: 7.2.3
+ Suggests: knitr, rmarkdown
+ VignetteBuilder: knitr
++RootcheckPatch: 2026-10-19 saddlepoint root verification (NR_Binary_SPA, Bisection_Binary_SPA, Saddle_Binary_SPA, Saddle_Binary_SPA_Bisection, STAAR_B_*SPA* callers, new rootcheck.cpp with gene/category context + per-call summary lines, rev 2); upstream commit 9db9dd504905b9f469146f670e5f6dbe3e08d01a
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/Bisection_Binary_SPA.cpp b/src/Bisection_Binary_SPA.cpp
+--- a/src/Bisection_Binary_SPA.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/Bisection_Binary_SPA.cpp	2026-10-19 12:05:24.422364397 -0400
+@@ -5,6 +5,7 @@
+ #include <RcppArmadillo.h>
+ #include <Rcpp.h>
+ #include <math.h>
++#include <float.h>
+ 
+ using namespace Rcpp;
+ // declare K1_Binary_SPA (first derivative)
+@@ -12,9 +13,13 @@
+ // declare K1_Binary_SPA_alt (first derivative, alternative way if not converge)
+ double K1_Binary_SPA_alt(double x, arma::vec muhat, arma::vec G, double q);
+ // check na
+-bool check_is_na(double x); 
++bool check_is_na(double x);
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++double rootcheck_rtol(double q);
++double rootcheck_K1(double x, arma::vec muhat, arma::vec G, double q);
++void rootcheck_log(const char* event, double q, double x_newton, double resid_newton, double x_final, double resid_final, int iter);
+ 
+ // [[Rcpp::export]]
+ double Bisection_Binary_SPA(arma::vec muhat, arma::vec G, double q, double xmin, double xmax, double tol)
+@@ -23,66 +28,89 @@
+     // the range of x to search
+     double xupper = xmax;
+     double xlower = xmin;
+-	
++
+ 	double K1left = 0.0;
+ 	double K1right = 0.0;
+-	
++
+     double x0 = 0.0;
+     double K1x0 = 1.0;
+-	
+-	K1left = K1_Binary_SPA(xlower, muhat, G, q);
+-	if((R_finite(K1left)==0)||(check_is_na(K1left)))
+-	{
+-		K1left = K1_Binary_SPA_alt(xlower, muhat, G, q);
+-	}
+-	
+-	K1right = K1_Binary_SPA(xupper, muhat, G, q);
+-	if((R_finite(K1right)==0)||(check_is_na(K1right)))
+-	{
+-		K1right = K1_Binary_SPA_alt(xupper, muhat, G, q);
+-	}
+-	
+-	if((!((R_finite(K1right)==0)||(check_is_na(K1right))))&&(!((R_finite(K1left)==0)||(check_is_na(K1left)))))
+-	{	
+-		if(!haveSameSign(K1left, K1right))
++
++	// ---- rootcheck patch (2026-10-19) ---------------------------------------------------------
++	// The original routine returned x0 = 0 when the endpoints did not bracket a root (the caller then
++	// reported p = 1, silently dropping the component) and stopped on an absolute interval width or
++	// residual of `tol` (1.2e-4). Now: non-finite endpoint values -> NA; endpoints of the same sign ->
++	// the bracket is expanded outward by doubling (K1(x) - q is increasing in x) and NA is returned if
++	// no sign change is found; the bisection then runs until the score-equation residual is within
++	// rootcheck_rtol(q) (or the interval is exhausted at machine precision), and the result is
++	// returned only if it passes that residual check, otherwise NA. Every outcome is logged.
++	double rtol = rootcheck_rtol(q);
++
++	K1left = rootcheck_K1(xlower, muhat, G, q);
++	K1right = rootcheck_K1(xupper, muhat, G, q);
++	if((R_finite(K1left)==0)||(check_is_na(K1left))||(R_finite(K1right)==0)||(check_is_na(K1right)))
++	{
++		rootcheck_log("bisection_nonfinite", q, xlower, K1left, xupper, K1right, 0);
++		return NA_REAL;
++	}
++
++	int expand = 0;
++	double width = xupper - xlower;
++	if(width < 1.0)
++	{
++		width = 1.0;
++	}
++	while(haveSameSign(K1left, K1right)&&(expand < 60))
++	{
++		if(K1right < 0)
++		{
++			xlower = xupper;
++			K1left = K1right;
++			xupper = xupper + width;
++			K1right = rootcheck_K1(xupper, muhat, G, q);
++		}else
+ 		{
+-			while ((fabs(xupper-xlower) > tol)&&(fabs(K1x0) > tol))
+-			{
+-				x0 = (xupper + xlower)/2.0;
+-				K1x0 = K1_Binary_SPA(x0, muhat, G, q);
+-				
+-				if((R_finite(K1x0)==0)||(check_is_na(K1x0)))
+-				{
+-					K1x0 = K1_Binary_SPA_alt(x0, muhat, G, q);
+-				}
+-			
+-				if(K1x0 == 0)
+-				{
+-					break;
+-				}else
+-				{
+-					if(haveSameSign(K1left, K1x0))
+-					{
+-						xlower = x0;
+-					}else
+-					{
+-						xupper = x0;
+-					}
+-				
+-					K1left = K1_Binary_SPA(xlower, muhat, G, q);
+-					if((R_finite(K1left)==0)||(check_is_na(K1left)))
+-					{
+-						K1left = K1_Binary_SPA_alt(xlower, muhat, G, q);
+-					}
+-	
+-					K1right = K1_Binary_SPA(xupper, muhat, G, q);
+-					if((R_finite(K1right)==0)||(check_is_na(K1right)))
+-					{
+-						K1right = K1_Binary_SPA_alt(xupper, muhat, G, q);
+-					}
+-				}
+-			}
+-		}		
++			xupper = xlower;
++			K1right = K1left;
++			xlower = xlower - width;
++			K1left = rootcheck_K1(xlower, muhat, G, q);
++		}
++		if((R_finite(K1left)==0)||(check_is_na(K1left))||(R_finite(K1right)==0)||(check_is_na(K1right)))
++		{
++			rootcheck_log("bisection_nonfinite", q, xlower, K1left, xupper, K1right, expand);
++			return NA_REAL;
++		}
++		width = width * 2.0;
++		expand = expand + 1;
++	}
++	if(haveSameSign(K1left, K1right))
++	{
++		rootcheck_log("bisection_nobracket", q, xlower, K1left, xupper, K1right, expand);
++		return NA_REAL;
++	}
++
++	int iter = 0;
++	x0 = (xupper + xlower)/2.0;
++	K1x0 = rootcheck_K1(x0, muhat, G, q);
++	while((iter < 400)&&(!((R_finite(K1x0)==0)||(check_is_na(K1x0))))&&(fabs(K1x0) > rtol)&&(fabs(xupper - xlower) > 4.0*DBL_EPSILON*fmax(1.0, fabs(x0))))
++	{
++		if(haveSameSign(K1left, K1x0))
++		{
++			xlower = x0;
++			K1left = K1x0;
++		}else
++		{
++			xupper = x0;
++			K1right = K1x0;
++		}
++		x0 = (xupper + xlower)/2.0;
++		K1x0 = rootcheck_K1(x0, muhat, G, q);
++		iter = iter + 1;
++	}
++	if((R_finite(x0)==0)||(check_is_na(x0))||(R_finite(K1x0)==0)||(check_is_na(K1x0))||(fabs(K1x0) > rtol))
++	{
++		rootcheck_log("bisection_unverified", q, xlower, K1left, x0, K1x0, iter);
++		return NA_REAL;
+ 	}
++	rootcheck_log((expand > 0) ? "bisection_ok_expanded" : "bisection_ok", q, xlower, K1left, x0, K1x0, iter);
+     return x0;
+ }
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/NR_Binary_SPA.cpp b/src/NR_Binary_SPA.cpp
+--- a/src/NR_Binary_SPA.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/NR_Binary_SPA.cpp	2026-10-19 12:05:03.475670495 -0400
+@@ -21,49 +21,53 @@
+ // declare K2_Binary_SPA_alt (second derivative, alternative way if not converge)
+ double K2_Binary_SPA_alt(double x, arma::vec muhat, arma::vec G);
+ // check na
+-bool check_is_na(double x); 
++bool check_is_na(double x);
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++double rootcheck_rtol(double q);
++double rootcheck_K1(double x, arma::vec muhat, arma::vec G, double q);
++void rootcheck_log(const char* event, double q, double x_newton, double resid_newton, double x_final, double resid_final, int iter);
+ 
+ // [[Rcpp::export]]
+ double NR_Binary_SPA(arma::vec muhat, arma::vec G, double q, double init, double tol, int max_iter)
+ {
+ 	double xi = 0.0;
+ 	double xi_update = 0.0;
+-	
++
+ 	// first step
+ 	xi = init;
+ 	xi_update = init;
+-	
++
+ 	if(fabs(K1_Binary_SPA(xi, muhat, G, q)) > tol)
+ 	{
+ 		xi_update = xi - K1_Binary_SPA(xi, muhat, G, q)/K2_Binary_SPA(xi, muhat, G);
+ 	}
+-	
++
+ 	// iteration number
+ 	int no_iter = 0;
+ 	double numerator = 0.0;
+ 	double denominator = 1.0;
+-	
++
+ 	while (!(check_is_na(xi_update))&&(R_finite(xi_update)==1)&&(fabs(xi_update - xi) > tol)&&(fabs(K1_Binary_SPA(xi_update, muhat, G, q)) > tol)&&(no_iter < max_iter))
+     {
+ 		no_iter = no_iter + 1;
+-		xi = xi_update;	
+-		
++		xi = xi_update;
++
+ 		// calculate numerator
+ 		numerator = K1_Binary_SPA(xi, muhat, G, q);
+ 		if((R_finite(numerator)==0)||(check_is_na(numerator)))
+ 		{
+ 			numerator = K1_Binary_SPA_alt(xi, muhat, G, q);
+ 		}
+-		
++
+ 		// calculate denominator
+ 		denominator = K2_Binary_SPA(xi, muhat, G);
+ 		if((R_finite(denominator)==0)||(check_is_na(denominator)))
+ 		{
+ 			denominator = K2_Binary_SPA_alt(xi, muhat, G);
+ 		}
+-		
++
+ 		xi_update = xi - numerator/denominator;
+     }
+ 
+@@ -72,18 +76,18 @@
+ 	{
+ 		xi_update = xi;
+ 	}
+-	
+-	
++
++
+ 	// test convergence
+-	double w = 0.0; 
+-	double xhat = 0.0; 
++	double w = 0.0;
++	double xhat = 0.0;
+ 	double ki = 0.0;
+ 
+ 	if(no_iter == max_iter)
+ 	{
+ 		w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+ 		xhat = xi_update;
+-		
++
+ 		if (xhat < 0){
+ 			w = -w;
+ 		}
+@@ -93,12 +97,66 @@
+ 		{
+ 			ki = xhat*sqrt(K2_Binary_SPA_alt(xhat,muhat,G));
+ 		}
+-	
++
+ 		if(fabs(w+log(ki/w)/w) < 38)
+ 		{
+-			xi_update = 0.0;	
++			xi_update = 0.0;
+ 		}
+ 	}
+-	
+-	return xi_update;
++
++	// ---- rootcheck patch (2026-10-19) ---------------------------------------------------------
++	// The original routine returned xi_update unconditionally. An iterate that hit max_iter, that
++	// stalled with a small step but a large residual, or that was reset to the last finite iterate
++	// after a non-finite step was handed to the saddlepoint formula as if it were a root (documented
++	// case: UK Biobank SNX22 synonymous, root 20.6 with residual 1.53, p 2.8e-16 instead of 0.052).
++	// Verify the score equation K1(x) - q = 0 at the returned iterate. A verified root is returned
++	// exactly as before. If the loop stopped on its own (looser, absolute) criterion but the residual
++	// exceeds the relative tolerance, polish with a few more Newton steps from the same iterate.
++	// Anything else returns NA_REAL, on which every caller falls back to bisection.
++	double rtol = rootcheck_rtol(q);
++	double x_newton = xi_update;
++	double resid = rootcheck_K1(xi_update, muhat, G, q);
++	double resid_newton = resid;
++	if((R_finite(xi_update)==0)||(check_is_na(xi_update))||(R_finite(resid)==0)||(check_is_na(resid))||(fabs(xi_update) > 1e10))
++	{
++		rootcheck_log("newton_nonfinite", q, x_newton, resid_newton, NA_REAL, NA_REAL, no_iter);
++		return NA_REAL;
++	}
++	if(fabs(resid) <= rtol)
++	{
++		return xi_update;
++	}
++	if(no_iter >= max_iter)
++	{
++		rootcheck_log("newton_maxiter", q, x_newton, resid_newton, NA_REAL, NA_REAL, no_iter);
++		return NA_REAL;
++	}
++	int extra = 0;
++	while((extra < 20)&&(fabs(resid) > rtol))
++	{
++		denominator = K2_Binary_SPA(xi_update, muhat, G);
++		if((R_finite(denominator)==0)||(check_is_na(denominator)))
++		{
++			denominator = K2_Binary_SPA_alt(xi_update, muhat, G);
++		}
++		double x_next = xi_update - resid/denominator;
++		if((R_finite(x_next)==0)||(check_is_na(x_next)))
++		{
++			break;
++		}
++		xi_update = x_next;
++		resid = rootcheck_K1(xi_update, muhat, G, q);
++		if((R_finite(resid)==0)||(check_is_na(resid)))
++		{
++			break;
++		}
++		extra = extra + 1;
++	}
++	if((R_finite(xi_update)==1)&&(R_finite(resid)==1)&&(fabs(resid) <= rtol)&&(fabs(xi_update) <= 1e10))
++	{
++		rootcheck_log("newton_polished", q, x_newton, resid_newton, xi_update, resid, extra);
++		return xi_update;
++	}
++	rootcheck_log("newton_unverified", q, x_newton, resid_newton, xi_update, resid, extra);
++	return NA_REAL;
+ }
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/STAAR_B_Binary_SPA.cpp b/src/STAAR_B_Binary_SPA.cpp
+--- a/src/STAAR_B_Binary_SPA.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/STAAR_B_Binary_SPA.cpp	2026-10-19 13:09:30.923351114 -0400
+@@ -33,6 +33,10 @@
+ bool check_is_na(double x); 
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++void rootcheck_set_call(int n_variants, double cmac, int wn);
++void rootcheck_set_component(int component, double p_normal);
++void rootcheck_end_call();
+ 
+ // [[Rcpp::export]]
+ arma::vec STAAR_B_Binary_SPA(arma::mat G, arma::mat XW, arma::mat XXWX_inv, arma::vec residuals, arma::vec muhat, arma::mat weights_B, double tol, int max_iter)
+@@ -68,6 +72,8 @@
+ 	arma::mat G_cumu;
+ 	G_cumu.zeros(vn,wn);
+ 	G_cumu = G_tilde*weights_B;
++	// rootcheck patch (2026-10-19): context of this burden call for the diagnostic log
++	rootcheck_set_call(un, arma::accu(G), wn);
+ 	
+ 	// init value of bisection
+ 	double xmin = -100.0;
+@@ -81,6 +87,7 @@
+ 			sum0 = sum0 + x(k)*weights_B(k,i);
+ 		}
+ 
++		rootcheck_set_component(i, NA_REAL);
+ 		// calculate p-value
+ 		respart1 = 1.0;
+ 		respart2 = 1.0;
+@@ -91,7 +98,12 @@
+ 			respart1 = Saddle_Binary_SPA_Bisection(fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower1);
+ 		}
+ 		
+-		if((check_is_na(respart1))||(respart1 == 1.0))
++		// rootcheck patch (2026-10-19): a solver failure (NA from both Newton and bisection) stays NA
++		// so that it is visible in the output; p == 1 from a root at zero stays 1.
++		if(check_is_na(respart1))
++		{
++			res(i) = NA_REAL;
++		}else if(respart1 == 1.0)
+ 		{
+ 			res(i) = 1;
+ 		}else
+@@ -103,7 +115,10 @@
+ 				respart2 = Saddle_Binary_SPA_Bisection(-fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower2);
+ 			}
+ 			
+-			if((check_is_na(respart2))||(respart2 == 1.0))
++			if(check_is_na(respart2))
++			{
++				res(i) = NA_REAL;
++			}else if(respart2 == 1.0)
+ 			{
+ 				res(i) = 1;
+ 			}else
+@@ -113,11 +128,13 @@
+ 		}
+ 		
+ 		// if saddle point approximation fails, set the p-value as 1.0
+-		if(res(i) > 1)
++		if((!check_is_na(res(i)))&&(res(i) > 1))
+ 		{
+ 			res(i) = 1;		
+ 		}
+ 	}
+ 
++	// rootcheck patch (2026-10-19): one summary line per burden call in the diagnostic log
++	rootcheck_end_call();
+ 	return res;
+ }
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/STAAR_B_SPA.cpp b/src/STAAR_B_SPA.cpp
+--- a/src/STAAR_B_SPA.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/STAAR_B_SPA.cpp	2026-10-19 13:09:30.976185237 -0400
+@@ -33,6 +33,10 @@
+ bool check_is_na(double x); 
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++void rootcheck_set_call(int n_variants, double cmac, int wn);
++void rootcheck_set_component(int component, double p_normal);
++void rootcheck_end_call();
+ 
+ // [[Rcpp::export]]
+ arma::vec STAAR_B_SPA(arma::mat G, arma::mat XW, arma::mat XXWX_inv, arma::vec residuals, arma::vec muhat, arma::mat weights_B, double tol, int max_iter,
+@@ -69,6 +73,8 @@
+ 	arma::mat G_cumu;
+ 	G_cumu.zeros(vn,wn);
+ 	G_cumu = G_tilde*weights_B;
++	// rootcheck patch (2026-10-19): context of this burden call for the diagnostic log
++	rootcheck_set_call(un, arma::accu(G), wn);
+ 	
+ 	// init value of bisection
+ 	double xmin = -100.0;
+@@ -130,6 +136,7 @@
+ 		if(res(i) < p_filter_cutoff)
+ 		{
+ 			
++			rootcheck_set_component(i, res(i));
+ 			// calculate p-value
+ 			respart1 = 1.0;
+ 			respart2 = 1.0;
+@@ -140,7 +147,12 @@
+ 				respart1 = Saddle_Binary_SPA_Bisection(fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower1);
+ 			}
+ 			
+-			if((check_is_na(respart1))||(respart1 == 1.0))
++			// rootcheck patch (2026-10-19): a solver failure (NA from both Newton and bisection) stays NA
++			// so that it is visible in the output; p == 1 from a root at zero stays 1.
++			if(check_is_na(respart1))
++			{
++				res(i) = NA_REAL;
++			}else if(respart1 == 1.0)
+ 			{
+ 				res(i) = 1;
+ 			}else
+@@ -152,7 +164,10 @@
+ 					respart2 = Saddle_Binary_SPA_Bisection(-fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower2);
+ 				}
+ 				
+-				if((check_is_na(respart2))||(respart2 == 1.0))
++				if(check_is_na(respart2))
++				{
++					res(i) = NA_REAL;
++				}else if(respart2 == 1.0)
+ 				{
+ 					res(i) = 1;
+ 				}else
+@@ -162,12 +177,14 @@
+ 			}
+ 			
+ 			// if saddle point approximation fails, set the p-value as 1.0
+-			if(res(i) > 1)
++			if((!check_is_na(res(i)))&&(res(i) > 1))
+ 			{
+ 				res(i) = 1;		
+ 			}
+ 		}
+ 	}
+ 
++	// rootcheck patch (2026-10-19): one summary line per burden call in the diagnostic log
++	rootcheck_end_call();
+ 	return res;
+ }
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/STAAR_B_SPA_SMMAT.cpp b/src/STAAR_B_SPA_SMMAT.cpp
+--- a/src/STAAR_B_SPA_SMMAT.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/STAAR_B_SPA_SMMAT.cpp	2026-10-19 13:09:31.030385082 -0400
+@@ -33,6 +33,10 @@
+ bool check_is_na(double x); 
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++void rootcheck_set_call(int n_variants, double cmac, int wn);
++void rootcheck_set_component(int component, double p_normal);
++void rootcheck_end_call();
+ 
+ // [[Rcpp::export]]
+ arma::vec STAAR_B_SPA_SMMAT(arma::mat G, arma::mat XW, arma::mat XXWX_inv, arma::vec residuals, arma::vec muhat, arma::mat weights_B, double tol, int max_iter,
+@@ -69,6 +73,8 @@
+ 	arma::mat G_cumu;
+ 	G_cumu.zeros(vn,wn);
+ 	G_cumu = G_tilde*weights_B;
++	// rootcheck patch (2026-10-19): context of this burden call for the diagnostic log
++	rootcheck_set_call(un, arma::accu(G), wn);
+ 	
+ 	// init value of bisection
+ 	double xmin = -100.0;
+@@ -117,6 +123,7 @@
+ 		if(res(i) < p_filter_cutoff)
+ 		{
+ 			
++			rootcheck_set_component(i, res(i));
+ 			// calculate p-value
+ 			respart1 = 1.0;
+ 			respart2 = 1.0;
+@@ -127,7 +134,12 @@
+ 				respart1 = Saddle_Binary_SPA_Bisection(fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower1);
+ 			}
+ 			
+-			if((check_is_na(respart1))||(respart1 == 1.0))
++			// rootcheck patch (2026-10-19): a solver failure (NA from both Newton and bisection) stays NA
++			// so that it is visible in the output; p == 1 from a root at zero stays 1.
++			if(check_is_na(respart1))
++			{
++				res(i) = NA_REAL;
++			}else if(respart1 == 1.0)
+ 			{
+ 				res(i) = 1;
+ 			}else
+@@ -139,7 +151,10 @@
+ 					respart2 = Saddle_Binary_SPA_Bisection(-fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower2);
+ 				}
+ 				
+-				if((check_is_na(respart2))||(respart2 == 1.0))
++				if(check_is_na(respart2))
++				{
++					res(i) = NA_REAL;
++				}else if(respart2 == 1.0)
+ 				{
+ 					res(i) = 1;
+ 				}else
+@@ -149,12 +164,14 @@
+ 			}
+ 			
+ 			// if saddle point approximation fails, set the p-value as 1.0
+-			if(res(i) > 1)
++			if((!check_is_na(res(i)))&&(res(i) > 1))
+ 			{
+ 				res(i) = 1;		
+ 			}
+ 		}
+ 	}
+ 
++	// rootcheck patch (2026-10-19): one summary line per burden call in the diagnostic log
++	rootcheck_end_call();
+ 	return res;
+ }
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/STAAR_B_SPA_SMMAT_sparse.cpp b/src/STAAR_B_SPA_SMMAT_sparse.cpp
+--- a/src/STAAR_B_SPA_SMMAT_sparse.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/STAAR_B_SPA_SMMAT_sparse.cpp	2026-10-19 13:09:31.083337586 -0400
+@@ -33,6 +33,10 @@
+ bool check_is_na(double x); 
+ // check same sign
+ bool haveSameSign(double a, double b);
++// rootcheck patch (2026-10-19): helpers in rootcheck.cpp
++void rootcheck_set_call(int n_variants, double cmac, int wn);
++void rootcheck_set_component(int component, double p_normal);
++void rootcheck_end_call();
+ 
+ // [[Rcpp::export]]
+ arma::vec STAAR_B_SPA_SMMAT_sparse(arma::mat G, arma::mat XW, arma::mat XXWX_inv, arma::vec residuals, arma::vec muhat, arma::mat weights_B, double tol, int max_iter,
+@@ -69,6 +73,8 @@
+ 	arma::mat G_cumu;
+ 	G_cumu.zeros(vn,wn);
+ 	G_cumu = G_tilde*weights_B;
++	// rootcheck patch (2026-10-19): context of this burden call for the diagnostic log
++	rootcheck_set_call(un, arma::accu(G), wn);
+ 	
+ 	// init value of bisection
+ 	double xmin = -100.0;
+@@ -122,6 +128,7 @@
+ 		if(res(i) < p_filter_cutoff)
+ 		{
+ 			
++			rootcheck_set_component(i, res(i));
+ 			// calculate p-value
+ 			respart1 = 1.0;
+ 			respart2 = 1.0;
+@@ -132,7 +139,12 @@
+ 				respart1 = Saddle_Binary_SPA_Bisection(fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower1);
+ 			}
+ 			
+-			if((check_is_na(respart1))||(respart1 == 1.0))
++			// rootcheck patch (2026-10-19): a solver failure (NA from both Newton and bisection) stays NA
++			// so that it is visible in the output; p == 1 from a root at zero stays 1.
++			if(check_is_na(respart1))
++			{
++				res(i) = NA_REAL;
++			}else if(respart1 == 1.0)
+ 			{
+ 				res(i) = 1;
+ 			}else
+@@ -144,7 +156,10 @@
+ 					respart2 = Saddle_Binary_SPA_Bisection(-fabs(sum0), muhat, G_cumu.col(i), tol, max_iter, xmin, xmax, lower2);
+ 				}
+ 				
+-				if((check_is_na(respart2))||(respart2 == 1.0))
++				if(check_is_na(respart2))
++				{
++					res(i) = NA_REAL;
++				}else if(respart2 == 1.0)
+ 				{
+ 					res(i) = 1;
+ 				}else
+@@ -154,13 +169,15 @@
+ 			}
+ 			
+ 			// if saddle point approximation fails, set the p-value as 1.0
+-			if(res(i) > 1)
++			if((!check_is_na(res(i)))&&(res(i) > 1))
+ 			{
+ 				res(i) = 1;		
+ 			}
+ 		}
+ 	}
+ 
++	// rootcheck patch (2026-10-19): one summary line per burden call in the diagnostic log
++	rootcheck_end_call();
+ 	return res;
+ }
+ 
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/Saddle_Binary_SPA.cpp b/src/Saddle_Binary_SPA.cpp
+--- a/src/Saddle_Binary_SPA.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/Saddle_Binary_SPA.cpp	2026-10-19 12:06:52.435605477 -0400
+@@ -40,6 +40,11 @@
+ 
+ 	// Saddle point approximation
+     double xhat = NR_Binary_SPA(muhat,G,q,init,tol,max_iter);
++    // rootcheck patch (2026-10-19): an unverified Newton root is NA; report NA so that the caller bisects
++    if(check_is_na(xhat))
++    {
++    	return NA_REAL;
++    }
+     double w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+ 	
+ 	if((R_finite(w)==0)||(check_is_na(w)))
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/Saddle_Binary_SPA_Bisection.cpp b/src/Saddle_Binary_SPA_Bisection.cpp
+--- a/src/Saddle_Binary_SPA_Bisection.cpp	2025-02-08 00:13:14.000000000 -0500
++++ b/src/Saddle_Binary_SPA_Bisection.cpp	2026-10-19 12:06:52.440608793 -0400
+@@ -55,6 +55,11 @@
+ 	}
+ 	
+     double xhat = Bisection_Binary_SPA(muhat, G, q, xmin, xmax, tol);
++    // rootcheck patch (2026-10-19): a bisection that could not bracket or verify a root is NA
++    if(check_is_na(xhat))
++    {
++    	return NA_REAL;
++    }
+     double w = sqrt(2*(xhat*q - K_Binary_SPA(xhat,muhat,G)));
+ 	
+ 	if((R_finite(w)==0)||(check_is_na(w)))
+diff -ruN -x '*.o' -x '*.so' -x .git a/src/rootcheck.cpp b/src/rootcheck.cpp
+--- a/src/rootcheck.cpp	1969-12-31 19:00:00.000000000 -0500
++++ b/src/rootcheck.cpp	2026-10-19 13:09:30.881876955 -0400
+@@ -0,0 +1,115 @@
++// rootcheck.cpp -- helpers added by the 2026-10-19 saddlepoint root-verification patch
++// (ukb_rootcheck_20261019). Not Rcpp-exported; linked into STAAR.so like every other src file.
++//
++// 1. rootcheck_rtol(q): the score-equation tolerance |K1(x) - q| <= 1e-6 * max(1, |q|).
++// 2. rootcheck_K1(): K1 with the package's alternative formula when the primary one is not finite.
++// 3. A diagnostic log. If the environment variable STAAR_ROOTCHECK_LOG names a file, one tab-separated
++//    line is appended for every saddlepoint root EVENT (Newton failure, Newton polish, bisection use)
++//    and one "call_done" line at the end of every burden call (STAAR_B_*SPA* caller). Nothing is written
++//    for a verified Newton root, so the cost is a few file appends per burden call.
++//    Columns (17): pkg, call_seq, n_variants, cMAC, n_weights, component, p_normal, tail, event, q,
++//                  x_newton, resid_newton, x_final, resid_final, iter, context, n_spa
++//    call_seq numbers the burden calls within the R session (one per STAAR_Binary_SPA call); component is
++//    the 0-based weight column; p_normal is the normal-approximation p that sent the component into SPA
++//    (NA when the caller has no filter); context is the value of the environment variable
++//    STAAR_ROOTCHECK_CONTEXT at the start of the call (the patched STAARpipeline sets it to
++//    "<gene>|<category>" before every gene-centric coding call; empty otherwise); n_spa is, on a call_done
++//    line, the number of components of the call that entered the saddlepoint branch (-1 on event lines).
++//    Event lines carry NA in n_spa, call_done lines carry NA in the solver fields.
++
++#define ARMA_64BIT_WORD 1
++#include <RcppArmadillo.h>
++#include <Rcpp.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <math.h>
++
++using namespace Rcpp;
++
++double K1_Binary_SPA(double x, arma::vec muhat, arma::vec G, double q);
++double K1_Binary_SPA_alt(double x, arma::vec muhat, arma::vec G, double q);
++bool check_is_na(double x);
++
++static const double ROOTCHECK_RTOL = 1e-6;
++
++double rootcheck_rtol(double q)
++{
++	double s = fabs(q);
++	if(s < 1.0) s = 1.0;
++	return ROOTCHECK_RTOL * s;
++}
++
++double rootcheck_K1(double x, arma::vec muhat, arma::vec G, double q)
++{
++	double r = K1_Binary_SPA(x, muhat, G, q);
++	if((R_finite(r)==0)||(check_is_na(r)))
++	{
++		r = K1_Binary_SPA_alt(x, muhat, G, q);
++	}
++	return r;
++}
++
++static long   rc_call_seq   = 0;
++static int    rc_n_variants = -1;
++static double rc_cmac       = -1.0;
++static int    rc_wn         = -1;
++static int    rc_component  = -1;
++static double rc_p_normal   = -1.0;
++static int    rc_n_spa      = 0;
++static char   rc_context[512] = "";
++
++void rootcheck_set_call(int n_variants, double cmac, int wn)
++{
++	rc_call_seq = rc_call_seq + 1;
++	rc_n_variants = n_variants;
++	rc_cmac = cmac;
++	rc_wn = wn;
++	rc_component = -1;
++	rc_p_normal = -1.0;
++	rc_n_spa = 0;
++	const char* c = std::getenv("STAAR_ROOTCHECK_CONTEXT");
++	if(c == NULL)
++	{
++		rc_context[0] = '\0';
++	}else
++	{
++		std::strncpy(rc_context, c, sizeof(rc_context) - 1);
++		rc_context[sizeof(rc_context) - 1] = '\0';
++		for(char* p = rc_context; *p != '\0'; ++p)
++		{
++			if((*p == '\t')||(*p == '\n')||(*p == '\r')) *p = ' ';
++		}
++	}
++}
++
++void rootcheck_set_component(int component, double p_normal)
++{
++	rc_component = component;
++	rc_p_normal = p_normal;
++	rc_n_spa = rc_n_spa + 1;
++}
++
++void rootcheck_log(const char* event, double q, double x_newton, double resid_newton, double x_final, double resid_final, int iter)
++{
++	const char* f = std::getenv("STAAR_ROOTCHECK_LOG");
++	if(f == NULL || f[0] == '\0') return;
++	FILE* fp = std::fopen(f, "a");
++	if(fp == NULL) return;
++	std::fprintf(fp, "STAAR\t%ld\t%d\t%.12g\t%d\t%d\t%.10g\t%s\t%s\t%.17g\t%.17g\t%.17g\t%.17g\t%.17g\t%d\t%s\tNA\n",
++	             rc_call_seq, rc_n_variants, rc_cmac, rc_wn, rc_component, rc_p_normal,
++	             (q < 0 ? "lower" : "upper"), event, q, x_newton, resid_newton, x_final, resid_final, iter, rc_context);
++	std::fclose(fp);
++}
++
++// one summary line per burden call (written by every STAAR_B_*SPA* caller just before it returns)
++void rootcheck_end_call()
++{
++	const char* f = std::getenv("STAAR_ROOTCHECK_LOG");
++	if(f == NULL || f[0] == '\0') return;
++	FILE* fp = std::fopen(f, "a");
++	if(fp == NULL) return;
++	std::fprintf(fp, "STAAR\t%ld\t%d\t%.12g\t%d\t%d\tNA\tnone\tcall_done\tNA\tNA\tNA\tNA\tNA\t0\t%s\t%d\n",
++	             rc_call_seq, rc_n_variants, rc_cmac, rc_wn, -1, rc_context, rc_n_spa);
++	std::fclose(fp);
++}
